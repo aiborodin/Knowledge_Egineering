@@ -70,8 +70,8 @@
             let names_div = $("#criteria-names");
             let input;
             for (let i = 0; i < criteriaCount; i++) {
-                program = `<input type="text" id="c${i}" class="criterion-name" placeholder="Criteria ${i+1}">`;
-                names_div.append(program);
+                input = `<input type="text" id="c${i}" class="criterion-name" placeholder="Criteria ${i+1}">`;
+                names_div.append(input);
             }
             // Create comparison matrix for 2-nd level criteria
             let tbody = $("#criteria-matrix > tbody");
@@ -91,8 +91,8 @@
             let alternativesCount = parseInt(searchParams.get("alternativesCount"), 10);
             names_div = $("#alternatives-names");
             for (let i = 0; i < alternativesCount; i++) {
-                program = `<input type="text" id="a${i}" class="alternative-name" placeholder="Alternative ${i+1}">`;
-                names_div.append(program);
+                input = `<input type="text" id="a${i}" class="alternative-name" placeholder="Alternative ${i+1}">`;
+                names_div.append(input);
             }
             // Create input forms for 3-nd level alternatives' comparison matrices
             let alternatives_div = $("div#alternatives-group");
@@ -119,29 +119,29 @@
 
             $('input.matrix-value').on('change', e => {
                 let input = e.target;
-                let td = $(program.parentElement);
+                let td = $(input.parentElement);
                 let i = td.parent().index();
                 let j = td.index();
                 let table = td.parent().parent();
-                table.children('tr').eq(j-1).children('td').eq(i).children()[0].value = 1 / program.value;
+                table.children('tr').eq(j-1).children('td').eq(i).children()[0].value = 1 / input.value;
             });
 
             $('input.criterion-name').on('change', e => {
                 let input = $(e.target);
-                let idx = program.index();
-                $('table#criteria-matrix > thead > tr > th[scope=col]').eq(idx+1).html(program.val());
-                $('table#criteria-matrix > tbody > tr > th[scope=row]').eq(idx).html(program.val());
-                $(`h5#alt-heading-${idx}`).text("Pair-wise comparison matrix for alternatives by " + program.val());
+                let idx = input.index();
+                $('table#criteria-matrix > thead > tr > th[scope=col]').eq(idx+1).html(input.val());
+                $('table#criteria-matrix > tbody > tr > th[scope=row]').eq(idx).html(input.val());
+                $(`h5#alt-heading-${idx}`).text("Pair-wise comparison matrix for alternatives by " + input.val());
             });
 
             $('input.alternative-name').on('change', ({target}) => {
                 let input = $(target);
-                let idx = program.index();
+                let idx = input.index();
                 $(`table.alternatives-matrix > thead`).each(function (index) {
-                    $(this).find(`tr > th[scope=col]:eq(${idx+1})`).html(program.val());
+                    $(this).find(`tr > th[scope=col]:eq(${idx+1})`).html(input.val());
                 });
                 $("table.alternatives-matrix > tbody").each(function (index) {
-                    $(this).find(`tr > th[scope=row]:eq(${idx})`).html(program.val());
+                    $(this).find(`tr > th[scope=row]:eq(${idx})`).html(input.val());
                 });
             });
 
