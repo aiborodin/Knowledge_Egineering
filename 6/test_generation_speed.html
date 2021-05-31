@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test rules speed</title>
+</head>
+<body>
+<label> Chess board size
+    <input id="size" type="number">
+    <button type="button" onclick="startTiming()">Calculate</button>
+</label>
+</body>
+<script>
+    function startTiming() {
+        let n = parseInt(document.getElementById('size').value, 10);
+        let t0, t1, rules;
+
+        t0 = performance.now();
+        rules = generateKnightRules1(n);
+        t1 = performance.now();
+        console.log('Method 1 took ' + (t1 - t0) + ' milliseconds.');
+
+        t0 = performance.now();
+        rules = generateKnightRules2(n);
+        t1 = performance.now();
+        console.log('Method 2 took ' + (t1 - t0) + ' milliseconds.');
+    }
+
+    function generateKnightRules1(n) {
+        // Returns Map<K, V> for production rules
+        // where <K> is an int position of a point in a chess board matrix and
+        // <V> is an Array<Point> of possible transitions from the position
+        let rulesMap = new Map();
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                if ((i - 2) >= 0) {
+                    if ((j - 2) >= 0) {
+                        saveRule(n, i, j, i - 2, j - 1, rulesMap);
+                        saveRule(n, i, j, i - 1, j - 2, rulesMap);
+                    } else if ((j - 1) >= 0) {
+                        saveRule(n, i, j, i - 2, j - 1, rulesMap);
+                    }
+                    if ((j + 2) < n) {
+                        saveRule(n, i, j, i - 2, j + 1, rulesMap);
+                        saveRule(n, i, j, i - 1, j + 2, rulesMap);
+                    } else if ((j + 1) < n) {
+                        saveRule(n, i, j, i - 2, j + 1, rulesMap);
+                    }
+                } else if ((i - 1) >= 0) {
+                    if ((j - 2) >= 0) {
+                        saveRule(n, i, j, i - 1, j - 2, rulesMap);
+                    }
+                    if ((j + 2) < n) {
+                        saveRule(n, i, j, i - 1, j + 2, rulesMap);
+                    }
+                }
+
+                if ((i + 2) < n) {
+                    if ((j - 2) >= 0) {
+                        saveRule(n, i, j, i + 1, j - 2, rulesMap);
+                        saveRule(n, i, j, i + 2, j - 1, rulesMap);
+                    } else if ((j - 1) >= 0) {
+                        saveRule(n, i, j, i + 2, j - 1, rulesMap);
+                    }
+                    if ((j + 2) < n) {
+                        saveRule(n, i, j, i + 1, j + 2, rulesMap);
+                        saveRule(n, i, j, i + 2, j + 1, rulesMap);
+                    } else if ((j + 1) < n) {
+                        saveRule(n, i, j, i + 2, j + 1, rulesMap);
+                    }
+                } else if ((i + 1) < n) {
+                    if ((j - 2) >= 0) {
+                        saveRule(n, i, j, i + 1, j - 2, rulesMap);
+                    }
+                    if ((j + 2) < n) {
+                        saveRule(n, i, j, i + 1, j + 2, rulesMap);
+                    }
+                }
+                // rulesMap.get(i * n + j).sort((p1, p2) => (p1.i * n + p1.j) - (p2.i * n + p2.j));
+            }
+        }
+        return rulesMap;
+    }
+    function generateKnightRules2(n) {
+        // Returns Map<K, V> for production rules
+        // where <K> is an int position of a point in a chess board matrix and
+        // <V> is an Array<Point> of possible transitions from the position
+        let rulesMap = new Map();
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                if ((i - 2) >= 0 && (j - 1) >= 0) {
+                    saveRule(n, i, j, i - 2, j - 1, rulesMap)
+                }
+                if ((i - 2) >= 0 && (j + 1) < n) {
+                    saveRule(n, i, j, i - 2, j + 1, rulesMap)
+                }
+                if ((i - 1) >= 0 && (j - 2) >= 0) {
+                    saveRule(n, i, j, i - 1, j - 2, rulesMap)
+                }
+                if ((i - 1) >= 0 && (j + 2) < n) {
+                    saveRule(n, i, j, i - 1, j + 2, rulesMap)
+                }
+                if ((i + 1) < n && (j - 2) >= 0) {
+                    saveRule(n, i, j, i + 1, j - 2, rulesMap)
+                }
+                if ((i + 1) < n && (j + 2) < n) {
+                    saveRule(n, i, j, i + 1, j + 2, rulesMap)
+                }
+                if ((i + 2) < n && (j - 1) >= 0) {
+                    saveRule(n, i, j, i + 2, j - 1, rulesMap)
+                }
+                if ((i + 2) < n && (j + 1) < n) {
+                    saveRule(n, i, j, i + 2, j + 1, rulesMap)
+                }
+            }
+        }
+        return rulesMap;
+    }
+    class Point {
+        constructor(i, j) {
+            this.i = i;
+            this.j = j;
+        }
+        getPosition(boardSize) {
+            return this.i * boardSize + this.j;
+        }
+    }
+    function saveRule(boardSize, i_curr, j_curr, i_next, j_next, rulesMap) {
+        let pointPosition = i_curr * boardSize + j_curr;
+        // console.log((pointPosition + 1) + ' -> ' + (i_next*boardSize+j_next+1));
+        if (rulesMap.has(pointPosition)) {
+            rulesMap.get(pointPosition).push(new Point(i_next, j_next));
+        } else {
+            rulesMap.set(pointPosition, [new Point(i_next, j_next)]);
+        }
+    }
+</script>
+</html>

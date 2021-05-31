@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+          integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <title>Fuzzy analytic hierarchy process</title>
+</head>
+<body>
+<div class="d-flex justify-content-center mt-3">
+    <div class="col-md-7" id="params" style="display: none;">
+        <h3>Enter Parameters</h3>
+        <form method="get" class="mt-3">
+            <div class="form-group row">
+                <label for="criteriaCount" class="col-md-4 col-form-label">Number of criteria:</label>
+                <div class="col-md-8">
+                    <input type="number" class="form-control" name="criteriaCount" id="criteriaCount" required>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="alternativesCount" class="col-md-4 col-form-label">Number of alternatives:</label>
+                <div class="col-md-8">
+                    <input class="form-control" type="number" name="alternativesCount" id="alternativesCount" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Next</button>
+            <button id="runExample" type="button" class="btn btn-info">Run Example</button>
+        </form>
+    </div>
+</div>
+<div class="container" id="input" style="display: none;">
+    <h5>Enter criteria names</h5>
+    <div class="form-group" id="criteria-names"></div>
+    <div id="criteria-group">
+        <h5>Pair-wise comparison matrix for criteria (2-nd level)</h5>
+        <table class="table table-bordered table-sm" id="criteria-matrix">
+            <thead>
+            <tr>
+                <th scope="col"></th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <div id="alternatives-group">
+        <h5>Enter alternatives names</h5>
+        <div class="form-group" id="alternatives-names"></div>
+    </div>
+    <button id="calculate" type="button" class="btn btn-primary">Calculate</button>
+    <button id="reset" type="button" class="btn btn-primary">Reset Parameters</button>
+    <div id="result" class="mt-3 align-self-center" style="display: none;">
+        <h5>Global synthesized priorities</h5>
+        <table class="table table-bordered table-sm" id="global_priorities">
+            <thead>
+            <tr>
+                <th scope="col">Alternative</th>
+                <th scope="col">Global Priority</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <div id="recommendation" class="alert alert-success mb-5" role="alert"></div>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.6.0/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+<script>
+    $(() => {
+        let searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.has("criteriaCount") && searchParams.has("alternativesCount")) {
+            // Hide params form
+            $("div#params").css("display", "none");
+            $("div#input").css("display", "");
+
+            // Create input forms for 2nd level criteria names
+            let criteriaCount = parseInt(searchParams.get("criteriaCount"), 10);
+            let names_div = $("#criteria-names");
+            let input;
+            for (let i = 0; i < criteriaCount; i++) {
+                input = `<input type="text" id="c${i}" class="criterion-name" placeholder="Criteria ${i + 1}">`;
+                names_div.append(input);
+            }
+
+            // Create fuzzy triangular scale represented by <option> elements in <select>
+            let select_scale = $('<select/>', {
+                class: 'custom-select fuzzy-number',
+                'aria-label': 'Select triangular fuzzy number'
+            });
+            select_scale.append('<option value="1">1</option>');
+            for (let i = 2; i <= 8; i++) {
+                select_scale.append(`<option value="${i}">(${i - 1}, ${i}, ${i + 1})</option>`);
+            }
+            select_scale.append('<option value="9">9</option>');
+            // Create inverse scale
+            select_scale.append(`<option value="1/2">(1/3, 1/2, 1)</option>`);
+            for (let i = 3; i <= 8; i++) {
+                select_scale.append(`<option value="1/${i}">(1/${i + 1}, 1/${i}, 1/${i - 1})</option>`);
+            }
+            select_scale.append(`<option value="1/9">1/9</option>`);
+
+            // Create comparison matrix for criteria (2nd level)
+            let tbody = $("table#criteria-matrix > tbody");
+            let tr_header = $("table#criteria-matrix > thead > tr");
+            let tr, td;
+            for (let i = 0; i < criteriaCount; i++) {
+                tr_header.append(`<th scope="col">C${i + 1}</th>`);
+                tr = $("<tr/>");
+                tr.append(`<th scope="row">C${i + 1}</th>`);
+                for (let j = 0; j < criteriaCount; j++) {
+                    td = $('<td/>');
+                    let select_copy = select_scale.clone().appendTo(td);
+                    if (i === j) {
+                        select_copy.prop('disabled', 'true');
+                    }
+                    tr.append(td);
+                }
+                tbody.append(tr);
+            }
+
+            // Create input forms for alternatives' names (3rd level)
+            let alternativesCount = parseInt(searchParams.get("alternativesCount"), 10);
+            names_div = $("div#alternatives-names");
+            for (let i = 0; i < alternativesCount; i++) {
+                input = `<input type="text" id="a${i}" class="alternative-name" placeholder="Alternative ${i + 1}">`;
+                names_div.append(input);
+            }
+            // Create comparison matrices for alternatives (3rd level) by i-th criterion
+            let alternatives_div = $("div#alternatives-group");
+            for (let i = 0; i < criteriaCount; i++) {
+                alternatives_div.append(`<h5 id="alt-heading-${i}">Pair-wise comparison matrix for alternatives by Criteria ${i + 1}</h5>`);
+                let table = $("<table/>", {
+                    class: "table table-bordered table-sm alternatives-matrix",
+                    id: `alternatives-matrix-${i}`
+                });
+                table.append(`<thead>
+                            <tr><th scope="col"></th></tr>
+                          </thead>
+                          <tbody></tbody>`);
+                let tr_header = table.find("> thead > tr");
+                let tbody = table.children("tbody");
+                for (let j = 0; j < alternativesCount; j++) {
+                    tr_header.append(`<th scope="col">A${j + 1}</th>`);
+                    let tr = $("<tr/>");
+                    tr.append(`<th scope="row">A${j + 1}</th>`);
+                    for (let k = 0; k < alternativesCount; k++) {
+                        td = $('<td/>');
+                        let select_copy = select_scale.clone().appendTo(td);
+                        if (j === k) {
+                            select_copy.prop('disabled', 'true');
+                        }
+                        tr.append(td);
+                    }
+                    tbody.append(tr);
+                }
+                alternatives_div.append(table);
+            }
+
+            // Triggers the inversion of the opposite triangular number in any comparison matrix
+            $('select.fuzzy-number').on('change', e => {
+                let select = e.target;
+                let td = $(select.parentElement);
+                let i = td.parent().index();
+                let j = td.index();
+                let tbody = td.parent().parent();
+                let inverseNumber;
+                if (select.value === '1') {
+                    inverseNumber = '1';
+                } else if (select.value.length === 1) {
+                    inverseNumber = '1/' + select.value;
+                } else {
+                    inverseNumber = select.value[2];
+                }
+                tbody.children('tr').eq(j - 1).children('td').eq(i).children().first().val(inverseNumber);
+            });
+
+            let $criteriaNames = $('input.criterion-name').on('change', e => {
+                let input = $(e.target);
+                let idx = input.index();
+                $('table#criteria-matrix > thead > tr > th[scope=col]').eq(idx + 1).html(input.val());
+                $('table#criteria-matrix > tbody > tr > th[scope=row]').eq(idx).html(input.val());
+                $(`h5#alt-heading-${idx}`).text("Pair-wise comparison matrix for alternatives by " + input.val());
+            });
+
+            let $alternativesNames = $('input.alternative-name').on('change', ({target}) => {
+                let input = $(target);
+                let idx = input.index();
+                $(`table.alternatives-matrix > thead`).each(function () {
+                    $(this).find(`tr > th[scope=col]:eq(${idx + 1})`).html(input.val());
+                });
+                $("table.alternatives-matrix > tbody").each(function () {
+                    $(this).find(`tr > th[scope=row]:eq(${idx})`).html(input.val());
+                });
+            });
+
+            $("#calculate").on("click", () => {
+                // Calculate result for criteria judgments matrix
+                let judgmentsMatrix = extractFuzzyMatrix("#criteria-matrix");
+                let criteriaPriorityVector = getPriorityVector(judgmentsMatrix);
+                // Calculate priority vectors for alternatives' judgments matrices
+                let priorityVectors = [];
+                for (let i = 0; i < criteriaCount; i++) {
+                    judgmentsMatrix = extractFuzzyMatrix(`#alternatives-matrix-${i}`);
+                    priorityVectors.push(getPriorityVector(judgmentsMatrix));
+                }
+                // Calculate global synthesized priorities
+                let synthesizedPriorities = [];
+                let priorityValue;
+                for (let i = 0; i < alternativesCount; i++) {
+                    priorityValue = 0;
+                    criteriaPriorityVector.forEach((criteriaPriority, idx) => priorityValue += criteriaPriority * priorityVectors[idx][i]);
+                    synthesizedPriorities.push(priorityValue);
+                }
+                // Output result
+                let alternativesNames = $("input.alternative-name").map((index, element) => element.value).get();
+                let tbody = $("#global_priorities > tbody");
+                let maxPriority = synthesizedPriorities[0], maxIdx = 0;
+                tbody.empty();
+                synthesizedPriorities.forEach((priority, idx) => {
+                    tbody.append(`<tr><td>${alternativesNames[idx] === '' ? `Alternative ${idx+1}` : alternativesNames[idx]}</td><td>${priority.toFixed(4)}</td></tr>`);
+                    if (synthesizedPriorities[idx] > maxPriority) {
+                        maxPriority = synthesizedPriorities[idx];
+                        maxIdx = idx;
+                    }
+                });
+                $('div#recommendation').html(`It is recommended to select <b>${alternativesNames[maxIdx]}</b>.
+                    It's priority is ${synthesizedPriorities[maxIdx].toFixed(4)}.`
+                );
+
+                $("#result").css("display", "");
+                window.location.hash = "#result";
+            });
+
+            $("button#reset").on("click", () => {
+                window.location.href = window.location.pathname;
+            });
+
+            if (searchParams.has('example')) {
+                // Example of choosing best wireless headphones for iPhone by the following criteria
+                let criteriaNames = ['Price', 'Sound quality', 'Design', 'Connectivity', 'Battery life', 'Functionality', 'Microphone'];
+                $criteriaNames.each((idx, input) => input.value = criteriaNames[idx]).change();
+
+                let alternativesNames = ['Airpods 2', 'Airpods Pro', 'Liberty Air 2', 'Oppo Enco W51'];
+                $alternativesNames.each((idx, input) => input.value = alternativesNames[idx]).change();
+
+                // The example's judgments matrix for criteria
+                // Inversions are triggered automatically by 'change' event
+                // Judgments for equally important criteria ('1') are omitted (chosen automatically in <select> tags)
+                let criteriaJudgmentMatrix = [
+                    ['', '', '', '', '', '2', ''],
+                    ['5', '', '4', '5', '5', '5', '3'],
+                    ['', '', '', '3', '3', '3', ''],
+                    ['', '', '', '', '', '3', ''],
+                    ['', '', '', '', '', '', ''],
+                    ['', '', '', '', '5', '', ''],
+                    ['3', '', '', '3', '6', '4', ''],
+                ];
+                $('table#criteria-matrix > tbody > tr > td > select.fuzzy-number').each(function() {
+                    let $select = $(this);
+                    let i = $select.parent().parent().index();
+                    let j = $select.parent().index() - 1; // Excluding <th scope="row"></th>
+                    if (criteriaJudgmentMatrix[i][j] !== '') {
+                        $select.val(criteriaJudgmentMatrix[i][j]).change();
+                    }
+                });
+
+                let alternativesJudgementMatrices = [
+                    // Comparisons by Price
+                    [
+                        ['', '4', '', ''],
+                        ['', '', '', ''],
+                        ['5', '7', '', ''],
+                        ['5', '7', '', '']
+                    ],
+                    // Comparisons by Sound quality
+                    [
+                        ['', '', '', '4'],
+                        ['4', '', '3', '7'],
+                        ['2', '', '', '4'],
+                        ['', '', '', '']
+                    ],
+                    // Comparisons by Design
+                    [
+                        ['', '', '', ''],
+                        ['3', '', '', ''],
+                        ['3', '', '', ''],
+                        ['4', '', '2', '']
+                    ],
+                    // Comparisons by Connectivity
+                    [
+                        ['', '', '5', '5'],
+                        ['', '', '5', '5'],
+                        ['', '', '', ''],
+                        ['', '', '', '']
+                    ],
+                    [
+                        ['', '', '', '2'],
+                        ['', '', '', '2'],
+                        ['3', '3', '', '5'],
+                        ['', '', '', '']
+                    ],
+                    [
+                        ['', '', '', ''],
+                        ['5', '', '4', '2'],
+                        ['3', '', '', ''],
+                        ['4', '', '3', '']
+                    ],
+                    [
+                        ['', '', '4', '4'],
+                        ['', '', '4', '4'],
+                        ['', '', '', ''],
+                        ['', '', '', '']
+                    ]
+                ];
+                for (let k = 0; k < criteriaCount; k++) {
+                    $(`table#alternatives-matrix-${k} > tbody > tr > td > select.fuzzy-number`).each(function() {
+                        let $select = $(this);
+                        let i = $select.parent().parent().index();
+                        let j = $select.parent().index() - 1; // Excluding <th scope="row"></th>
+                        if (alternativesJudgementMatrices[k][i][j] !== '') {
+                            $select.val(alternativesJudgementMatrices[k][i][j]).change();
+                        }
+                    });
+                }
+                $('button#calculate').click();
+            }
+        } else {
+            $("div#params").css("display", "");
+        }
+
+        $('button#runExample').on('click', () => {
+            window.location.href = window.location.pathname + '?criteriaCount=7&alternativesCount=4&example=true';
+        });
+    });
+
+    class TriangularNumber {
+        constructor(low, med, high) {
+            this.low = low;
+            this.medium = med;
+            this.high = high;
+        }
+
+        add(number) {
+            this.low += number.low;
+            this.medium += number.medium;
+            this.high += number.high;
+            return this;
+        }
+
+        multiply(number) {
+            this.low *= number.low;
+            this.medium *= number.medium;
+            this.high *= number.high;
+            return this;
+        }
+
+        divide(number) {
+            this.low /= number.high;
+            this.medium /= number.medium;
+            this.high /= number.low;
+            return this;
+        }
+
+        pow(power) {
+            this.low = Math.pow(this.low, power);
+            this.medium = Math.pow(this.medium, power);
+            this.high = Math.pow(this.high, power);
+            return this;
+        }
+
+        defuzzify() {
+            return (this.low + this.medium + this.high) / 3;
+        }
+    }
+
+    function extractFuzzyMatrix(tableId) {
+        return Array.prototype.map.call(document.querySelectorAll(`${tableId} > tbody > tr`), function (tr) {
+            return Array.prototype.map.call(tr.querySelectorAll('td > select'), function (select) {
+                if (select.value.length === 1) {
+                    let mediumValue = parseFloat(select.value);
+                    if (mediumValue === 1 || mediumValue === 9) {
+                        return new TriangularNumber(mediumValue, mediumValue, mediumValue);
+                    } else {
+                        return new TriangularNumber(mediumValue - 1, mediumValue, mediumValue + 1);
+                    }
+                } else {
+                    let mediumDenominator = parseFloat(select.value[2]);
+                    return new TriangularNumber(1 / (mediumDenominator + 1), 1 / mediumDenominator, 1 / (mediumDenominator - 1));
+                }
+            });
+        });
+    }
+
+    function getPriorityVector(fuzzyMatrix) {
+        // Calculate geometric means (eigen values) of fuzzy comparison numbers for each row
+        let eigenVectorSum = new TriangularNumber(0, 0, 0);
+        let eigenValue;
+        let eigenVector = fuzzyMatrix.map(array => {
+            eigenValue = array.reduce((product, current) => product.multiply(current)).pow(1 / fuzzyMatrix.length);
+            eigenVectorSum = eigenVectorSum.add(eigenValue);
+            return eigenValue;
+        });
+        // Calculate fuzzy weights vector
+        let fuzzyWeightsVector = eigenVector.map(eigenValue => eigenValue.divide(eigenVectorSum));
+        // Defuzzify weights
+        let crispSum = 0;
+        let crispValue;
+        let crispVector = fuzzyWeightsVector.map(weight => {
+            crispValue = weight.defuzzify();
+            crispSum += crispValue;
+            return crispValue;
+        });
+        // Return normalized crisp weights
+        return crispVector.map(crispValue => crispValue / crispSum);
+    }
+</script>
+</body>
+</html>
