@@ -88,17 +88,17 @@
                 class: 'custom-select fuzzy-number',
                 'aria-label': 'Select triangular fuzzy number'
             });
-            select_scale.append('<option value="1">1</option>');
+            select_scale.append('<option value="1">(1, 1, 1)</option>');
             for (let i = 2; i <= 8; i++) {
                 select_scale.append(`<option value="${i}">(${i - 1}, ${i}, ${i + 1})</option>`);
             }
-            select_scale.append('<option value="9">9</option>');
+            select_scale.append('<option value="9">(9, 9, 9)</option>');
             // Create inverse scale
             select_scale.append(`<option value="1/2">(1/3, 1/2, 1)</option>`);
             for (let i = 3; i <= 8; i++) {
                 select_scale.append(`<option value="1/${i}">(1/${i + 1}, 1/${i}, 1/${i - 1})</option>`);
             }
-            select_scale.append(`<option value="1/9">1/9</option>`);
+            select_scale.append(`<option value="1/9">(1/9, 1/9, 1/9)</option>`);
 
             // Create comparison matrix for criteria (2nd level)
             let tbody = $("table#criteria-matrix > tbody");
@@ -224,7 +224,7 @@
                         maxIdx = idx;
                     }
                 });
-                $('div#recommendation').html(`It is recommended to select <b>${alternativesNames[maxIdx]}</b>.
+                $('div#recommendation').html(`It is recommended to select <b>${alternativesNames[maxIdx] === '' ? `Alternative ${maxIdx+1}` : alternativesNames[maxIdx]}</b>.
                     It's priority is ${synthesizedPriorities[maxIdx].toFixed(4)}.`
                 );
 
@@ -398,7 +398,7 @@
         let eigenValue;
         let eigenVector = fuzzyMatrix.map(array => {
             eigenValue = array.reduce((product, current) => product.multiply(current)).pow(1 / fuzzyMatrix.length);
-            eigenVectorSum = eigenVectorSum.add(eigenValue);
+            eigenVectorSum.add(eigenValue);
             return eigenValue;
         });
         // Calculate fuzzy weights vector
